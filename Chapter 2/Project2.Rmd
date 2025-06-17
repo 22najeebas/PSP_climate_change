@@ -1,0 +1,125 @@
+---
+title: "Project 2 - CA Covid-19 Vaccine Data.RMD"
+author: "Najeeba Shaikh"
+date: "2025-06-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(ggplot2)
+library(zoo)
+```
+
+# load dataset, name - vaccine_admin
+```{r}
+vaccine_admin <-read.csv("covid-19-progress-county-051021.csv")
+head(vaccine_admin)
+```
+
+# trim extra white space off dataset
+```{r}
+vaccine_admin$county <- trimws(vaccine_admin$county, which = "both")
+```
+
+```{r}
+vaccine_admin$administered_date <- as.Date(vaccine_admin$administered_date, format = "%Y-%m-%d")
+```
+
+#Calculating the percentage of those vaccinated:
+```{r}
+vaccine_CA <- subset(vaccine_admin, county == "All CA Counties")
+```
+
+```{r}
+CA_pop <- c(39466917)
+
+# calculating the percentage of those who have has at least one dose, and rounding the numbers to decimal points
+
+vaccine_CA$fully_percent <- round(((vaccine_CA$cumulative_fully_vaccinated/CA_pop)*100), digits = 2)
+tail(vaccine_CA)
+
+vaccine_CA$partial_percent <- (vaccine_CA$cumulative_at_least_one_dose/CA_pop)*100
+vaccine_CA$partial_percent <- round(vaccine_CA$partial_percent, digits = 2)
+
+
+vaccine_CA$fully_percent <- round(((vaccine_CA$cumulative_fully_vaccinated/CA_pop)*100), digits = 2)
+```
+```{r}
+names(vaccine_CA)
+```
+
+```{r}
+
+# plotting the initial graph with the first layer for the partially vaccinated
+
+ggplot(data = vaccine_CA, aes(x = administered_date, y = partial_percent))+
+  geom_area(fill = "darkolivegreen3") +
+  geom_area(aes(x = administered_date, y = fully_percent), fill = "forestgreen")
+```
+
+```{r}
+ggplot(data = vaccine_CA, aes(x = administered_date, y = partial_percent))+
+  geom_area(fill = "darkolivegreen3", alpha = 0.4) +
+  geom_area(aes(x = administered_date, y = fully_percent), fill = "forestgreen", alpha = 0.4)
+```
+
+```{r}
+ggplot(data = vaccine_CA, aes(x = administered_date, y = partial_percent)) +
+  geom_area(fill="green") + 
+  geom_area(aes(x= administered_date, y = fully_percent), fill="blue") +
+  ylim(0, 100) +
+  geom_hline(yintercept = 80, linetype='longdash')
+```
+
+```{r}
+# rolling averages over 7 days, function rollman()
+
+vaccine_CA$wk_avg <- zoo::rollmean(vaccine_CA$total_doses, k = 7, fill = NA)
+
+# Round the number to nearest whole number
+
+vaccine_CA$wk_avg <- round(vaccine_CA$wk_avg, digits = 0)
+```
+
+```{r}
+# fill in the county of your choice to subset
+SF <- subset(vaccine_admin, county == "San Francisco")
+
+# Fill in the county's population
+county_pop <- c(815000)
+
+# Calculate the percentage the percentage of those who have had at least one dose in that county
+SF$partial_percent <- (SF$cumulative_at_least_one_dose/county_pop)*100
+SF$partial_percent <- round(SF$partial_percent, digits = 2)
+
+SF$fully_percent <-round(((SF$cumulative_fully_vaccinated/county_pop)*100), digits = 2)
+```
+
+```{r}
+
+```
+
+
+
+# Now let's add some labels to the plot
+
+# For the plot:
+# 1) Add a title
+# 2) Change the name of the x-axis
+# 3) Change the name of the y-axis
+
+
+```{r}
+pdf ("Project 2")
+
+ggplot(data = vaccine_CA, aes(x = administered_date, y = partial_percent))+
+  geom_area(fill = "darkolivegreen3", alpha = 0.4) +
+  geom_area(aes(x = administered_date, y = fully_percent), fill = "forestgreen", alpha = 0.4)
+
+dev.off()
+```
+

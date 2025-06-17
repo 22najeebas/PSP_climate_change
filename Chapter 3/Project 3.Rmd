@@ -1,0 +1,80 @@
+---
+title: "Project 3 - Covid Cases Data"
+author: "Najeeba Shaikh"
+date: "2025-06-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+getwd()
+setwd("/Users/najeebashaikh/Desktop/PINC_Climate_Change/Chapter 3/")
+```
+
+```{r}
+library("dplyr")
+library("ggplot2")
+
+library("RColorBrewer")
+```
+
+```{r}
+COVIDraw <- read.csv("us-counties.csv")
+```
+
+
+```{r}
+COVIDraw$date <- as.Date(COVIDraw$date)
+class(COVIDraw$date)
+```
+
+```{r}
+California_COVIDraw <- subset(COVIDraw, county == "California counties")
+```
+
+```{r}
+California_counties_COVIDraw <- subset(COVIDraw, county == "San Francisco" | 
+                                          county == "Alameda" | 
+                                          county == "Marin" | 
+                                          county == "Sonoma" | 
+                                          county == "San Mateo" | 
+                                          county == "Contra Costa" | 
+                                          county == "Santa Clara" | 
+                                          county == "Solano" | 
+                                          county == "Napa")
+```
+
+
+
+```{r}
+ggplot(California_counties_COVIDraw) + 
+  geom_point(aes(x= date, y = cases, col= county))+
+  scale_color_brewer(palette = "Spectral")
+
+```
+
+
+```{r}
+ggplot(California_counties_COVIDraw, aes(x= date, y = cases, col = county)) + 
+  geom_point()+
+  scale_color_brewer(palette = "Spectral")+
+  scale_x_date(date_labels = "%01 %2020", date_breaks = "1 month") +
+  ylab("Covid cases") + labs(title = "California_counties_COVID", col = "lavender",
+                                       caption = "Key")
+```
+
+``` {r}
+ggplot(California_counties_COVIDraw, aes(x= date, y = cases, col = county)) + 
+  geom_point()+
+  scale_color_brewer(palette = "Spectral")+
+  scale_x_date(date_labels = "%01 %2020", date_breaks = "1 month") +
+  ylab("Covid cases") + labs(title = "California_counties_COVID", col = "lavender",
+                                       caption = "Key")+
+  guides(colour = guide_legend(override.aes = list(size = 5))) +
+  theme_bw() + theme(panel.grid.minor.x = element_blank(), axis.title.x = element_blank(), legend.position = "bottom",
+                     legend.title = element_text(face = "bold"))
+```
+

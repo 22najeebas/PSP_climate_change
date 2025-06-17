@@ -1,0 +1,150 @@
+---
+title: "California-BioClim-Project-PINC"
+author: "Najeeba Shaikh"
+date: "2025-06-12"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+getwd()
+```
+
+```{r}
+setwd("/Users/najeebashaikh/Desktop/PINC_Climate_Change/Mini-Project 1 - Bees/")
+```
+
+```{r}
+library("ggplot2")
+
+library("chron")
+
+library("RColorBrewer")
+
+library("tidyr")
+
+library("dplyr")
+
+library("tidyverse")
+
+library("mapview")
+
+``` 
+
+#read the dataset
+```{r}
+Cali_bioclim <- read.csv("california_bioclim.csv")
+```
+
+#Check the structure of your data using summary() and head()
+```{r}
+head(Cali_bioclim)
+```
+
+```{r}
+summary(Cali_bioclim)
+```
+
+# Remove rows with missing values (NA)
+```{r}
+
+```
+
+# Rename columns with their real-world names (e.g., BIO1 → Annual MeanTemp)
+```{r}
+BioClim_Cali <- Cali_bioclim %>%
+  rename(Annual_Mean_Temperature = bio1, Mean_Diurnal_Range = bio2, Isothermality = bio3, Temperature_Seasonality = bio4, Max_Temperature_of_Warmest_Month = bio5, Min_Temperature_of_Warmest_Month = bio6, Temperature_Annual_Range = bio7, Mean_Temperature_of_Wettest_Quarter = bio8, Mean_Temperature_of_Driest_Quarter = bio9, Mean_Temperature_of_Warmest_Quarter = bio10, Mean_Temperature_of_Coldest_Quarter = bio11, Annual_Precipitation = bio12, Precipitation_of_Wettest_Month = bio13, Precipitation_of_Driest_Month = bio14, Precipitation_Seasonality = bio15, Precipitation_of_Wettest_Quarter = bio16, Precipitation_of_Driest_Quarter = bio17, Precipitation_of_Warmest_Quarter = bio18, Precipitation_of_Coldest_Quarter = bio19)
+```
+
+# Convert temperature columns from Celsius to Fahrenheit (original dataset)
+# mutate(column_name_f = column_name_c * 9/5 + 32)
+# bio1 - bio11 are temp
+```{r}
+Fahrenheit_data <- transform(Cali_bioclim,
+                             bio1_F = bio1* 9/5 + 32, 
+                             bio2_F = bio2* 9/5 + 32,
+                             bio3_F = bio3* 9/5 + 32,
+                             bio4_F = bio4 * 9/5 + 32,
+                             bio5_F = bio5 * 9/5 + 32,
+                             bio6_F = bio6 * 9/5 + 32,
+                             bio7_F = bio7* 9/5 + 32,
+                             bio8_F = bio8* 9/5 + 32,
+                             bio9_F = bio9* 9/5 + 32,
+                             bio10_F = bio10* 9/5 + 32,
+                             bio11_F = bio11* 9/5 + 32)
+```
+
+# Use three mathematical functions like mean, sd
+```{r}
+mean(BioClim_Cali$Total_Specimens)
+```
+
+```{r}
+sd(BioClim_Cali$Total_Specimens)
+```
+
+```{r}
+abs(BioClim_Cali$Annual_Precipitation)
+```
+
+# Find and report the maximum species richness and temperature values
+```{r}
+max(BioClim_Cali$X_ENDC_RICHNESS_)
+```
+
+```{r}
+max(BioClim_Cali$Mean_Temperature_of_Coldest_Quarter)
+```
+
+## Plot three different types of graphs
+```{r}
+ggplot(BioClim_Cali, aes(x = grid_cell, y = Annual_Mean_Temperature)) +
+  geom_line(color = "skyblue", size = 1) +
+  geom_area(fill = "lightblue", alpha = 0.4) +  # Fill under the line
+  labs(
+    title = "Annual Mean Temperature Across Grid Cells",
+    x = "Grid Cell",
+    y = "Annual Mean Temperature (°C)"
+  ) +
+  theme_minimal()
+```
+```{r}
+ggplot(BioClim_Cali, aes(x = Precipitation_Seasonality, y = Annual_Precipitation)) +
+  geom_hex(color = "pink", size = 1) +
+  geom_area(fill = "yellow", alpha = 0.4) +  # Fill under the line
+  labs(
+    title = "Seasonal Precipitation vs Annual Precipitation",
+    x = "Seasonal Precipitation",
+    y = "Annual Precipitation"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(BioClim_Cali, aes(x = Precipitation_of_Driest_Quarter, y = Precipitation_of_Warmest_Quarter, z = Precipitation_of_Coldest_Quarter), col = "Precipitation") +
+  scale_color_brewer(palette = "Spectral") +
+  geom_contour_filled(color = "forestgreen", size = 1) +
+  geom_area(fill = "darkgreen", alpha = 0.2)
+  
+```
+```{r}
+ggplot(BioClim_Cali, aes(x = X_ENDC_RICHNESS_, y = Total_Specimens)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue", alpha = 0.7)
+```
+
+
+# Make a California map using the grid coordinates
+```{r}
+mapview(BioClim_Cali, xcol = "X_Axis_0_", ycol = "X_Axis_1_", crs = 3310, grid = TRUE)
+```
+
+
+
+
+
