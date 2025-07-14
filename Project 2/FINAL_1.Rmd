@@ -1,0 +1,1037 @@
+---
+title: "FINAL_1"
+author: "Najeeba Shaikh"
+date: "2025-07-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readr")
+library("dplyr")
+library("ggplot2")
+library("sf")
+library("tidyr")
+library("mapview")
+library("viridis")
+library("viridisLite")
+library("vegan")
+
+ncld_detailed_percentage <- read.csv("~/Desktop/PINC_Climate_Change/Project 2/nlcd_2001_detailed_percentages.csv")
+
+colnames(ncld_detailed_percentage) <- c(
+  "grid_cell",                         # grid_cell (assuming it's the first column)
+  "Open_Water",                        # 11
+  "Developed_Open_Space",              # 21
+  "Developed_Low_Intensity",           # 22
+  "Developed_Medium_Intensity",        # 23
+  "Developed_High_Intensity",          # 24
+  "Barren_Land_Rock_Sand_Clay",        # 31
+  "Deciduous_Forest",                  # 41
+  "Evergreen_Forest",                  # 42
+  "Mixed_Forest",                      # 43
+  "Shrub_Scrub",                       # 52
+  "Grassland_Herbaceous",              # 71
+  "Pasture_Hay",                       # 81
+  "Cultivated_Crops",                  # 82
+  "Woody_Wetlands",                    # 90
+  "Emergent_Herbaceous_Wetlands"       # 95
+)
+
+read.csv("~/Desktop/PINC_Climate_Change/Project 2/california_bioclim.csv")
+bio_clim <- read.csv("~/Desktop/PINC_Climate_Change/Project 2/california_bioclim.csv")
+
+colnames(bio_clim) <- c(
+  "grid_cell",                          # grid_cell (assuming it's the first column)
+  "Annual_Mean_Temperature",            # BIO1
+  "Mean_Diurnal_Range",                 # BIO2
+  "Isothermality",                      # BIO3
+  "Temperature_Seasonality",            # BIO4
+  "Max_Temperature_of_Warmest_Month",   # BIO5
+  "Min_Temperature_of_Coldest_Month",   # BIO6
+  "Temperature_Annual_Range",           # BIO7
+  "Mean_Temperature_of_Wettest_Quarter", # BIO8
+  "Mean_Temperature_of_Driest_Quarter", # BIO9
+  "Mean_Temperature_of_Warmest_Quarter",# BIO10
+  "Mean_Temperature_of_Coldest_Quarter",# BIO11
+  "Annual_Precipitation",               # BIO12
+  "Precipitation_of_Wettest_Month",     # BIO13
+  "Precipitation_of_Driest_Month",      # BIO14
+  "Precipitation_Seasonality",          # BIO15
+  "Precipitation_of_Wettest_Quarter",   # BIO16
+  "Precipitation_of_Driest_Quarter",    # BIO17
+  "Precipitation_of_Warmest_Quarter",   # BIO18
+  "Precipitation_of_Coldest_Quarter"    # BIO19
+)
+
+processed_diversity <- read.csv("~/Desktop/PINC_Climate_Change/Project 2/processed_diversity.csv")
+
+# merge the datasets
+DATA_1 <- merge(bio_clim, ncld_detailed_percentage, by = "grid_cell")
+
+DATA <- merge(DATA_1, processed_diversity, by = "grid_cell")
+
+#make graph
+mapview(DATA, xcol = "X_Axis_0_", ycol = "X_Axis_1_", crs = 3310, grid = TRUE)
+
+# Convert DATA to spatial (sf) object
+DATA_sf <- st_as_sf(DATA, coords = c("X_Axis_0_", "X_Axis_1_"), crs = 3310)
+mapview(DATA_sf, zcol = "Developed_High_Intensity")
+
+ggplot(DATA_sf) +
+  geom_sf(aes(color = Developed_Open_Space), size = 1) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Developed Open Space in California")
+
+DATA_sf$Total_Developed <- DATA_sf$Developed_Open_Space +
+  DATA_sf$Developed_Low_Intensity +
+  DATA_sf$Developed_Medium_Intensity +
+  DATA_sf$Developed_High_Intensity
+
+ggplot(DATA_sf) +
+  geom_sf(aes(color = Total_Developed), size = 1) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Total Developed Land in California")
+
+mapview(DATA_sf, zcol = "Developed_Low_Intensity")
+mapview(DATA_sf, zcol = "Developed_Medium_Intensity")
+mapview(DATA_sf, zcol = "Developed_High_Intensity")
+
+library(tidyr)
+library(RColorBrewer)
+
+# Pivot longer for faceted plotting
+DATA_long <- DATA_sf %>%
+  pivot_longer(cols = c(Developed_Low_Intensity,
+                        Developed_Medium_Intensity,
+                        Developed_High_Intensity),
+               names_to = "Development_Type",
+               values_to = "Percentage")
+
+ggplot(DATA_long) +
+  geom_sf(aes(color = Percentage), size = 0.8) +
+  scale_color_viridis_c(option = "C") +
+  facet_wrap(~ Development_Type) +
+  theme_minimal() +
+  labs(title = "Developed Land Intensity Types in California")
+
+plot(st_geometry(DATA_sf))  # Should look like California!
+
+
+```
+```{r}
+ggplot(DATA_long) +
+  geom_sf(aes(color = Percentage), size = 0.8) +
+  scale_color_viridis_c(option = "C") +
+  facet_wrap(~ Development_Type, ncol = 1, strip.position = "top") +  # One column, clearer labels
+  theme_minimal(base_size = 14) +  # Larger base font
+  theme(
+    strip.text = element_text(size = 14, face = "bold"),  # Facet labels
+    axis.text.x = element_text(angle = 45, hjust = 1),     # Tilt x-axis labels
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  ) +
+  labs(
+    title = "Developed Land Intensity Types in California",
+    color = "Percent Cover"
+  )
+
+```
+
+```{r}
+# Clean labels before plotting
+DATA_long$Development_Type <- recode(DATA_long$Development_Type,
+  Developed_Low_Intensity = "Low Intensity",
+  Developed_Medium_Intensity = "Medium Intensity",
+  Developed_High_Intensity = "High Intensity"
+)
+
+# Plot with horizontal layout and clean labels
+ggplot(DATA_long) +
+  geom_sf(aes(color = Percentage), size = 0.8) +
+  scale_color_viridis_c(option = "C") +
+  facet_wrap(~ Development_Type, nrow = 1) +  # horizontal layout
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(size = 14, face = "bold"),
+    axis.text.x = element_blank(),   # remove x-axis labels
+    axis.ticks.x = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  labs(
+    title = "Developed Land Intensity Types in California",
+    color = "Percentage"
+  )
+
+```
+
+```{r}
+library(ggplot2)
+library(tidyr)
+
+DATA_long <- DATA_sf %>%
+  pivot_longer(cols = c(Developed_Open_Space,
+                        Developed_Low_Intensity,
+                        Developed_Medium_Intensity,
+                        Developed_High_Intensity),
+               names_to = "Development_Type",
+               values_to = "Percentage")
+
+ggplot(DATA_long, aes(x = Development_Type, y = Percentage, fill = Development_Type)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(option = "C") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Boxplot of Developed Land Types",
+       x = "Development Type",
+       y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+library(dplyr)
+
+summary_data <- DATA_long %>%
+  group_by(Development_Type) %>%
+  summarise(mean_pct = mean(Percentage),
+            sd_pct = sd(Percentage),
+            .groups = "drop")
+
+ggplot(summary_data, aes(x = Development_Type, y = mean_pct, fill = Development_Type)) +
+  geom_bar(stat = "identity", color = "black") +
+  geom_errorbar(aes(ymin = mean_pct - sd_pct, ymax = mean_pct + sd_pct), width = 0.2) +
+  scale_fill_viridis_d(option = "C") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Mean Percentage of Development Types",
+       x = "Development Type",
+       y = "Mean Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+library(dplyr)
+
+binned_data <- DATA_long %>%
+  mutate(Percent_Bin = cut(Percentage, breaks = seq(0, 100, by = 10))) %>%
+  group_by(Development_Type, Percent_Bin) %>%
+  summarise(mean_richness = mean(X_ENDC_RICHNESS_, na.rm = TRUE),
+            .groups = "drop")
+
+ggplot(binned_data, aes(x = Percent_Bin, y = mean_richness, color = Development_Type, group = Development_Type)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  scale_color_viridis_d(option = "D") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Mean Species Richness by Binned Land Cover Intensity",
+       x = "Binned % Land Cover",
+       y = "Mean Species Richness") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+# High and medium intensity development reduce biodiversity when they dominate a grid cell.
+# Low-intensity development has a hump-shaped relationship, possibly peaking in ecotones or transitional zones.
+# The surprising peak in high-intensity (20–30%) might be due to:
+# A small number of urban-edge sites that still support biodiversity.
+# Averaging across few data points, leading to skew.
+
+
+
+
+
+```{r}
+heat_data <- DATA_long %>%
+  mutate(Percent_Bin = cut(Percentage, breaks = seq(0, 100, by = 5)),
+         Richness_Bin = cut(X_ENDC_RICHNESS_, breaks = seq(floor(min(X_ENDC_RICHNESS_, na.rm = TRUE)),
+                                                           ceiling(max(X_ENDC_RICHNESS_, na.rm = TRUE)), by = 2))) %>%
+  group_by(Development_Type, Percent_Bin, Richness_Bin) %>%
+  summarise(count = n(), .groups = "drop")
+
+ggplot(heat_data, aes(x = Percent_Bin, y = Richness_Bin, fill = count)) +
+  geom_tile() +
+  facet_wrap(~ Development_Type) +
+  scale_fill_viridis_c(option = "C", na.value = "white") +
+  theme_minimal(base_size = 13) +
+  labs(title = "Heatmap of Species Richness vs. Developed Land Cover",
+       x = "% Land Cover (Binned)",
+       y = "Species Richness (Binned)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Re-bin with fewer breaks for readability
+DATA_long <- DATA_sf %>%
+  pivot_longer(cols = c(Developed_Open_Space,
+                        Developed_Low_Intensity,
+                        Developed_Medium_Intensity,
+                        Developed_High_Intensity),
+               names_to = "Development_Type",
+               values_to = "Percentage") %>%
+  mutate(
+    Percent_Bin = cut(Percentage, breaks = seq(0, 100, by = 10), include.lowest = TRUE),
+    Richness_Bin = cut(X_ENDC_RICHNESS_, breaks = 8)  # Fewer bins, auto-calculated range
+  )
+
+# Count observations in each bin
+heat_data <- DATA_long %>%
+  group_by(Development_Type, Percent_Bin, Richness_Bin) %>%
+  summarise(count = n(), .groups = "drop")
+
+# Improved heatmap
+ggplot(heat_data, aes(x = Percent_Bin, y = Richness_Bin, fill = count)) +
+  geom_tile(color = "white", linewidth = 0.1) +
+  facet_wrap(~ Development_Type) +
+  scale_fill_viridis_c(option = "D", direction = -1, na.value = "grey90") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Improved Heatmap: Richness vs. Land Development",
+    x = "% Land Cover (Binned)",
+    y = "Species Richness (Binned)",
+    fill = "Count"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+
+```
+# Low- and open-intensity development can coexist with biodiversity, but the relationship is variable.
+# Medium- and high-intensity development are consistently associated with low richness, even at low percentages — a strong sign of ecological impact.
+# Spatial planning could prioritize open space and limit medium/high intensity development in areas of high conservation value.
+
+```{r}
+library(ggplot2)
+library(tidyr)
+
+# Reshape development types into long format
+DATA_long <- DATA_sf %>%
+  pivot_longer(cols = c(Developed_Open_Space,
+                        Developed_Low_Intensity,
+                        Developed_Medium_Intensity,
+                        Developed_High_Intensity),
+               names_to = "Development_Type",
+               values_to = "Percentage")
+
+# Scatterplot with trend line
+ggplot(DATA_long, aes(x = Percentage, y = X_ENDC_RICHNESS_)) +
+  geom_point(alpha = 0.5, color = "black") +
+  geom_smooth(method = "lm", se = TRUE, color = "darkblue") +
+  facet_wrap(~ Development_Type, scales = "free_x") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Species Richness vs. Developed Land Types",
+       x = "Percent Land Cover",
+       y = "Species Richness")
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Development columns to reshape
+cols_to_use <- c("Developed_Open_Space",
+                 "Developed_Low_Intensity",
+                 "Developed_Medium_Intensity",
+                 "Developed_High_Intensity")
+
+# Ensure columns are numeric
+DATA_sf <- DATA_sf %>%
+  mutate(across(all_of(cols_to_use), ~ suppressWarnings(as.numeric(as.character(.)))))
+
+# Filter out rows where all dev columns are missing or invalid
+DATA_filtered <- DATA_sf %>%
+  filter(if_any(all_of(cols_to_use), ~ !is.na(.) & . >= 0 & . <= 100))
+
+# Pivot to long format
+DATA_long_full <- DATA_filtered %>%
+  pivot_longer(cols = all_of(cols_to_use),
+               names_to = "Development_Type",
+               values_to = "Percentage")
+
+# Final plot
+ggplot(DATA_long_full, aes(x = Percentage, y = X_ENDC_RICHNESS_)) +
+  geom_point(alpha = 0.5, color = "skyblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  facet_wrap(~ Development_Type, scales = "free_x") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Species Richness vs. Developed Land Types",
+    x = "Percent Land Cover",
+    y = "Species Richness"
+  )
+
+# add r^2 values and slopes
+
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(sf)
+
+# Define columns of interest
+cols_to_use <- c("Developed_Open_Space",
+                 "Developed_Low_Intensity",
+                 "Developed_Medium_Intensity",
+                 "Developed_High_Intensity")
+
+# Ensure numeric
+DATA_sf <- DATA_sf %>%
+  mutate(across(all_of(cols_to_use), ~ suppressWarnings(as.numeric(as.character(.)))))
+
+# Filter
+DATA_filtered <- DATA_sf %>%
+  filter(if_any(all_of(cols_to_use), ~ !is.na(.) & . >= 0 & . <= 100))
+
+# Pivot to long
+DATA_long <- DATA_filtered %>%
+  pivot_longer(cols = all_of(cols_to_use),
+               names_to = "Development_Type",
+               values_to = "Percentage")
+
+# Fit models per Development_Type
+model_stats <- DATA_long %>%
+  group_by(Development_Type) %>%
+  summarise(
+    slope = coef(lm(X_ENDC_RICHNESS_ ~ Percentage))[2],
+    r_squared = summary(lm(X_ENDC_RICHNESS_ ~ Percentage))$r.squared,
+    correlation = cor(Percentage, X_ENDC_RICHNESS_, use = "complete.obs", method = "pearson"),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = paste0("Slope = ", round(slope, 2),
+                   "\nR² = ", round(r_squared, 2),
+                   "\nr = ", round(correlation, 2))
+  )
+
+# Drop geometry to compute label positions safely
+label_positions <- DATA_long %>%
+  st_drop_geometry() %>%
+  group_by(Development_Type) %>%
+  summarise(
+    x = max(Percentage, na.rm = TRUE) * 0.7,
+    y = max(X_ENDC_RICHNESS_, na.rm = TRUE) * 0.9,
+    .groups = "drop"
+  ) %>%
+  left_join(model_stats, by = "Development_Type")
+
+# Final plot
+ggplot(DATA_long, aes(x = Percentage, y = X_ENDC_RICHNESS_)) +
+  geom_point(alpha = 0.5, color = "skyblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  facet_wrap(~ Development_Type, scales = "free_x") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Species Richness vs. Developed Land Types",
+    x = "Percent Land Cover",
+    y = "Species Richness"
+  ) +
+  geom_text(data = label_positions,
+            aes(x = x, y = y, label = label),
+            inherit.aes = FALSE,
+            size = 3,  # Reduced text size
+            hjust = 0)
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(sf)
+
+# Define columns of interest
+cols_to_use <- c("Developed_Open_Space",
+                 "Developed_Low_Intensity",
+                 "Developed_Medium_Intensity",
+                 "Developed_High_Intensity")
+
+# Ensure numeric
+DATA_sf <- DATA_sf %>%
+  mutate(across(all_of(cols_to_use), ~ suppressWarnings(as.numeric(as.character(.)))))
+
+# Filter for reasonable percentages
+DATA_filtered <- DATA_sf %>%
+  filter(if_any(all_of(cols_to_use), ~ !is.na(.) & . >= 0 & . <= 100))
+
+# Pivot to long
+DATA_long <- DATA_filtered %>%
+  pivot_longer(cols = all_of(cols_to_use),
+               names_to = "Development_Type",
+               values_to = "Percentage")
+
+# Fit models per Development_Type
+model_stats <- DATA_long %>%
+  group_by(Development_Type) %>%
+  summarise(
+    slope = coef(lm(X_ENDC_RICHNESS_ ~ Percentage))[2],
+    r_squared = summary(lm(X_ENDC_RICHNESS_ ~ Percentage))$r.squared,
+    correlation = cor(Percentage, X_ENDC_RICHNESS_, use = "complete.obs"),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = paste0("Slope = ", round(slope, 2),
+                   "\nR² = ", round(r_squared, 2),
+                   "\nr = ", round(correlation, 2))
+  )
+
+# Drop geometry to position labels
+label_positions <- DATA_long %>%
+  st_drop_geometry() %>%
+  group_by(Development_Type) %>%
+  summarise(
+    x = min(Percentage, na.rm = TRUE) + 1,
+    y = max(X_ENDC_RICHNESS_, na.rm = TRUE) * 0.95,
+    .groups = "drop"
+  ) %>%
+  left_join(model_stats, by = "Development_Type")
+
+# Final plot
+ggplot(DATA_long, aes(x = Percentage, y = X_ENDC_RICHNESS_)) +
+  geom_point(alpha = 0.5, color = "skyblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  facet_wrap(~ Development_Type, scales = "free_x") +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(hjust = 0),  # left-align facet labels
+    plot.title = element_text(size = 18, face = "bold")
+  ) +
+  labs(
+    title = "Species Richness vs. Developed Land Types",
+    x = "Percent Land Cover",
+    y = "Species Richness"
+  ) +
+  geom_text(data = label_positions,
+            aes(x = x, y = y, label = label),
+            inherit.aes = FALSE,
+            size = 2.8, hjust = 0, vjust = 1)
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(sf)
+
+# Choose valid columns
+cols_to_use <- c("Developed_Low_Intensity",
+                 "Developed_Medium_Intensity",
+                 "Developed_High_Intensity")
+
+# Clean and filter
+DATA_filtered <- DATA_sf %>%
+  mutate(across(all_of(cols_to_use), ~ suppressWarnings(as.numeric(as.character(.))))) %>%
+  filter(across(all_of(cols_to_use), ~ !is.na(.) & . >= 0 & . <= 100))
+
+# Pivot to long
+DATA_long <- DATA_filtered %>%
+  pivot_longer(cols = all_of(cols_to_use),
+               names_to = "Development_Type",
+               values_to = "Percentage")
+
+# Create facet-friendly labels
+DATA_long$Development_Type <- factor(DATA_long$Development_Type,
+                                     levels = cols_to_use,
+                                     labels = c("Low Intensity", "Medium Intensity", "High Intensity"))
+
+# Stats per type
+model_stats <- DATA_long %>%
+  group_by(Development_Type) %>%
+  summarise(
+    slope = coef(lm(X_ENDC_RICHNESS_ ~ Percentage))[2],
+    r_squared = summary(lm(X_ENDC_RICHNESS_ ~ Percentage))$r.squared,
+    correlation = cor(Percentage, X_ENDC_RICHNESS_, use = "complete.obs"),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = paste0("Slope = ", round(slope, 2),
+                   "\nR² = ", round(r_squared, 2),
+                   "\nr = ", round(correlation, 2))
+  )
+
+# Label positions
+label_positions <- DATA_long %>%
+  st_drop_geometry() %>%
+  group_by(Development_Type) %>%
+  summarise(
+    x = min(Percentage, na.rm = TRUE) + 1,
+    y = max(X_ENDC_RICHNESS_, na.rm = TRUE) * 0.95,
+    .groups = "drop"
+  ) %>%
+  left_join(model_stats, by = "Development_Type")
+
+# Custom colors
+my_colors <- c("Low Intensity" = "pink", 
+               "Medium Intensity" = "lavender", 
+               "High Intensity" = "coral1")
+
+# ✨ Final Poster-Worthy Plot
+ggplot(DATA_long, aes(x = Percentage, y = X_ENDC_RICHNESS_, color = Development_Type)) +
+  geom_point(alpha = 0.5, size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, size = 1.2) +
+  facet_wrap(~ Development_Type, scales = "free_x") +
+  scale_color_manual(values = my_colors) +
+  geom_text(data = label_positions,
+            aes(x = x, y = y, label = label, color = Development_Type),
+            inherit.aes = FALSE,
+            size = 3.5, hjust = 0, fontface = "bold") +
+  theme_minimal(base_size = 16) +
+  theme(
+    strip.text = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 12),
+    legend.position = "none"
+  ) +
+  labs(
+    title = "Species Richness vs. Developed Land Cover Types",
+    x = "Percent Land Cover",
+    y = "Species Richness"
+  )
+
+```
+
+
+```{r}
+bee_matrix <- processed_diversity %>%
+  select(grid_cell, starts_with("sp")) %>%
+  mutate(across(-grid_cell, ~ replace_na(., 0)))
+
+# Quick diagnostics
+summary(rowSums(bee_matrix[-1]))
+length(unique(as.data.frame(bee_matrix[-1])))
+
+set.seed(123)
+
+bee_matrix <- data.frame(grid_cell = paste0("cell_", 1:50))
+for (i in 1:20) {
+  bee_matrix[[paste0("sp", i)]] <- rpois(50, lambda = sample(0:5, 1))
+}
+
+# Remove empty or duplicate rows
+bee_matrix <- bee_matrix %>%
+  filter(rowSums(across(-grid_cell)) > 0) %>%
+  distinct(across(-grid_cell), .keep_all = TRUE)
+
+rownames(bee_matrix) <- bee_matrix$grid_cell
+species_only <- bee_matrix %>% select(-grid_cell)
+
+# Run NMDS
+nmds_result <- metaMDS(species_only, k = 2, trymax = 100)
+
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(viridis)
+
+# Step 1: Get NMDS coordinates
+nmds_scores <- as.data.frame(nmds_result$points)
+nmds_scores$grid_cell <- rownames(nmds_scores)
+
+# Step 2: Add fake development % and bin it for color
+set.seed(42)
+nmds_scores$Total_Developed <- sample(0:100, size = nrow(nmds_scores), replace = TRUE)
+
+nmds_scores <- nmds_scores %>%
+  mutate(
+    Dev_Category = cut(Total_Developed,
+                       breaks = c(-1, 10, 25, 50, 100),
+                       labels = c("Very Low", "Low", "Moderate", "High"))
+  )
+
+# Step 3: Plot the NMDS
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Dev_Category)) +
+  geom_point(size = 3.5, alpha = 0.85) +
+  scale_color_viridis_d(option = "C") +
+  theme_minimal(base_size = 16) +
+  labs(
+    title = "NMDS of Simulated Bee Communities",
+    subtitle = "Colored by Simulated Development Level",
+    x = "NMDS1", y = "NMDS2", color = "Development"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+```
+
+```{r}
+library(ggplot2)
+library(ggforce)    # for ellipses
+library(viridis)
+library(dplyr)
+
+# Use your working NMDS scores with Dev_Category
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Dev_Category)) +
+  # Ellipses to group development levels
+  ggforce::geom_mark_ellipse(aes(label = Dev_Category, group = Dev_Category),
+                             label.fontsize = 12, label.fill = "white",
+                             color = "black", alpha = 0.05, expand = unit(1, "mm")) +
+  
+  # Bee points
+  geom_point(size = 4, alpha = 0.9) +
+  
+  # Color palette
+  scale_color_viridis_d(option = "C", begin = 0.2, end = 0.9) +
+  
+  # Labels and styling
+  labs(
+    title = "🧭 NMDS of Simulated Bee Communities",
+    subtitle = "Grouped by Development Level",
+    x = "NMDS1",
+    y = "NMDS2",
+    color = "Development"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(face = "bold", size = 18),
+    plot.subtitle = element_text(size = 14),
+    legend.position = "right",
+    panel.grid = element_blank()
+  )
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(plotly)
+
+# Clean and prepare your data
+DATA_long <- DATA_sf %>%
+  mutate(across(c(Developed_Open_Space,
+                  Developed_Low_Intensity,
+                  Developed_Medium_Intensity,
+                  Developed_High_Intensity,
+                  X_ENDC_RICHNESS_), ~ as.numeric(.))) %>%
+  pivot_longer(cols = c(Developed_Open_Space,
+                        Developed_Low_Intensity,
+                        Developed_Medium_Intensity,
+                        Developed_High_Intensity),
+               names_to = "Development_Type",
+               values_to = "Percent_Cover") %>%
+  filter(!is.na(Percent_Cover) & Percent_Cover >= 0 & Percent_Cover <= 100) %>%
+  mutate(
+    Development_Type = recode(Development_Type,
+                              Developed_Open_Space = "Open Space",
+                              Developed_Low_Intensity = "Low Intensity",
+                              Developed_Medium_Intensity = "Medium Intensity",
+                              Developed_High_Intensity = "High Intensity")
+  )
+
+# Create one plot for each development type
+plots <- DATA_long %>%
+  group_split(Development_Type) %>%
+  lapply(function(df) {
+    plot_ly(df,
+            x = ~Percent_Cover,
+            y = ~X_ENDC_RICHNESS_,
+            type = 'scatter',
+            mode = 'markers',
+            marker = list(size = 5, opacity = 0.7),
+            name = unique(df$Development_Type),
+            text = ~paste0("Richness: ", X_ENDC_RICHNESS_,
+                           "<br>Percent: ", round(Percent_Cover, 1), "%"),
+            hoverinfo = "text") %>%
+      layout(
+        title = list(text = unique(df$Development_Type), x = 0.5),
+        xaxis = list(title = "% Land Cover"),
+        yaxis = list(title = "Bee Species Richness")
+      )
+  })
+
+# Combine all plots into subplots (2 rows × 2 columns)
+subplot(plots, nrows = 2, shareX = TRUE, shareY = TRUE, titleX = TRUE, titleY = TRUE) %>%
+  layout(title = "Interactive Bee Richness vs. Land Development Intensity",
+         showlegend = FALSE)
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(plotly)
+
+# Prepare long-format data
+DATA_long <- DATA_sf %>%
+  mutate(across(c(Developed_Open_Space,
+                  Developed_Low_Intensity,
+                  Developed_Medium_Intensity,
+                  Developed_High_Intensity,
+                  X_ENDC_RICHNESS_), ~ as.numeric(.))) %>%
+  pivot_longer(cols = c(Developed_Open_Space,
+                        Developed_Low_Intensity,
+                        Developed_Medium_Intensity,
+                        Developed_High_Intensity),
+               names_to = "Development_Type",
+               values_to = "Percent_Cover") %>%
+  filter(!is.na(Percent_Cover) & Percent_Cover >= 0 & Percent_Cover <= 100) %>%
+  mutate(
+    Development_Type = recode(Development_Type,
+      Developed_Open_Space = "Open Space",
+      Developed_Low_Intensity = "Low Intensity",
+      Developed_Medium_Intensity = "Medium Intensity",
+      Developed_High_Intensity = "High Intensity")
+  )
+
+# Unified interactive scatter plot
+plot_ly(
+  data = DATA_long,
+  x = ~Percent_Cover,
+  y = ~X_ENDC_RICHNESS_,
+  color = ~Development_Type,
+  colors = "Set2",
+  type = "scatter",
+  mode = "markers",
+  marker = list(size = 5, opacity = 0.7),
+  text = ~paste("Development:", Development_Type,
+                "<br>Land Cover:", round(Percent_Cover, 1), "%",
+                "<br>Richness:", X_ENDC_RICHNESS_),
+  hoverinfo = "text"
+) %>%
+  layout(
+    title = "Bee Species Richness vs. Land Development Intensity",
+    xaxis = list(title = "% Land Cover"),
+    yaxis = list(title = "Bee Species Richness"),
+    legend = list(title = list(text = "<b>Development Type</b>"))
+  )
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(plotly)
+
+# Step 1: Prepare data
+DATA_long <- DATA_sf %>%
+  mutate(across(c(Developed_Open_Space,
+                  Developed_Low_Intensity,
+                  Developed_Medium_Intensity,
+                  Developed_High_Intensity,
+                  X_ENDC_RICHNESS_), as.numeric)) %>%
+  
+  pivot_longer(cols = starts_with("Developed_"),
+               names_to = "Development_Type",
+               values_to = "Percent_Cover") %>%
+  
+  filter(!is.na(Percent_Cover), Percent_Cover >= 0, Percent_Cover <= 100) %>%
+  
+  # Force character matching to prevent factor duplicates
+  mutate(
+    Development_Type = as.character(Development_Type),
+    Development_Type = case_when(
+      Development_Type == "Developed_Open_Space" ~ "Open Space",
+      Development_Type == "Developed_Low_Intensity" ~ "Low Intensity",
+      Development_Type == "Developed_Medium_Intensity" ~ "Medium Intensity",
+      Development_Type == "Developed_High_Intensity" ~ "High Intensity",
+      TRUE ~ Development_Type
+    ),
+    Development_Type = factor(Development_Type, levels = c("Open Space", "Low Intensity", "Medium Intensity", "High Intensity"))
+  )
+
+# Step 2: Plot
+plot_ly(
+  data = DATA_long,
+  x = ~Percent_Cover + 0.1,  # offset to allow log scale (no 0s)
+  y = ~X_ENDC_RICHNESS_,
+  color = ~Development_Type,
+  colors = "Set2",
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(size = 5, opacity = 0.5),
+  text = ~paste0("<b>", Development_Type, "</b><br>",
+                 "Land Cover: ", round(Percent_Cover, 2), "%<br>",
+                 "Richness: ", X_ENDC_RICHNESS_),
+  hoverinfo = "text"
+) %>%
+  layout(
+    title = "Bee Species Richness vs. Land Development Intensity",
+    xaxis = list(title = "% Land Cover (log-scaled)", type = "log"),
+    yaxis = list(title = "Bee Species Richness"),
+    legend = list(title = list(text = "<b>Development Type</b>")),
+    margin = list(l = 60, r = 40, t = 60, b = 50)
+  )
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(plotly)
+
+# Step 1: Clean data
+DATA_long <- DATA_sf %>%
+  mutate(across(c(Developed_Open_Space,
+                  Developed_Low_Intensity,
+                  Developed_Medium_Intensity,
+                  Developed_High_Intensity,
+                  X_ENDC_RICHNESS_), as.numeric)) %>%
+  pivot_longer(cols = starts_with("Developed_"),
+               names_to = "Development_Type",
+               values_to = "Percent_Cover") %>%
+  filter(!is.na(Percent_Cover), Percent_Cover >= 0, Percent_Cover <= 100) %>%
+  mutate(
+    Development_Type = recode(Development_Type,
+      "Developed_Open_Space" = "Open Space",
+      "Developed_Low_Intensity" = "Low Intensity",
+      "Developed_Medium_Intensity" = "Medium Intensity",
+      "Developed_High_Intensity" = "High Intensity"
+    )
+  )
+
+# Step 2: Build plot traces manually
+dev_levels <- unique(DATA_long$Development_Type)
+colors <- RColorBrewer::brewer.pal(length(dev_levels), "Set2")
+plot <- plot_ly()
+
+for (i in seq_along(dev_levels)) {
+  dev_type <- dev_levels[i]
+  df_sub <- DATA_long %>% filter(Development_Type == dev_type)
+
+  # Linear model for trend line and R²
+  fit <- lm(X_ENDC_RICHNESS_ ~ Percent_Cover, data = df_sub)
+  r2 <- round(summary(fit)$r.squared, 2)
+  line_df <- data.frame(
+    Percent_Cover = seq(min(df_sub$Percent_Cover), max(df_sub$Percent_Cover), length.out = 100)
+  )
+  line_df$Predicted <- predict(fit, newdata = line_df)
+
+  # Add points
+  plot <- plot %>%
+    add_trace(
+      data = df_sub,
+      x = ~Percent_Cover + 0.1,
+      y = ~X_ENDC_RICHNESS_,
+      type = 'scatter',
+      mode = 'markers',
+      name = paste0(dev_type, " (R² = ", r2, ")"),
+      marker = list(size = 5, opacity = 0.5, color = colors[i]),
+      showlegend = TRUE
+    ) %>%
+    # Add regression line
+    add_trace(
+      data = line_df,
+      x = ~Percent_Cover + 0.1,
+      y = ~Predicted,
+      type = 'scatter',
+      mode = 'lines',
+      line = list(color = colors[i], width = 2),
+      name = paste0(dev_type, " Trend"),
+      showlegend = FALSE
+    )
+}
+
+# Step 3: Layout
+plot %>%
+  layout(
+    title = "Bee Species Richness vs. Land Development Intensity (with R²)",
+    xaxis = list(title = "% Land Cover (log-scaled)", type = "log"),
+    yaxis = list(title = "Bee Species Richness"),
+    legend = list(title = list(text = "<b>Development Type</b>")),
+    margin = list(l = 60, r = 40, t = 60, b = 50)
+  )
+
+
+```
+
+```{r}
+# Load libraries
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(RColorBrewer)
+
+# Step 1: Clean and reshape data
+DATA_long <- DATA_sf %>%
+  mutate(across(c(Developed_Open_Space,
+                  Developed_Low_Intensity,
+                  Developed_Medium_Intensity,
+                  Developed_High_Intensity,
+                  X_ENDC_RICHNESS_), as.numeric)) %>%
+  pivot_longer(cols = starts_with("Developed_"),
+               names_to = "Development_Type",
+               values_to = "Percent_Cover") %>%
+  filter(!is.na(Percent_Cover), Percent_Cover >= 0, Percent_Cover <= 100) %>%
+  mutate(
+    Development_Type = recode(Development_Type,
+      "Developed_Open_Space" = "Open Space",
+      "Developed_Low_Intensity" = "Low Intensity",
+      "Developed_Medium_Intensity" = "Medium Intensity",
+      "Developed_High_Intensity" = "High Intensity"
+    )
+  )
+
+# Step 2: Define colors and create base plot
+dev_levels <- unique(DATA_long$Development_Type)
+colors <- brewer.pal(length(dev_levels), "Set2")
+plot <- plot_ly()
+
+# Step 3: Loop through each development type and add points + trend line
+for (i in seq_along(dev_levels)) {
+  dev_type <- dev_levels[i]
+  df_sub <- DATA_long %>% filter(Development_Type == dev_type)
+  
+  # Fit linear model
+  fit <- lm(X_ENDC_RICHNESS_ ~ Percent_Cover, data = df_sub)
+  r2 <- round(summary(fit)$r.squared, 2)
+  
+  # Create predicted trend line
+  line_df <- data.frame(
+    Percent_Cover = seq(min(df_sub$Percent_Cover), max(df_sub$Percent_Cover), length.out = 100)
+  )
+  line_df$Predicted <- predict(fit, newdata = line_df)
+  
+  # Add scatter points
+  plot <- plot %>%
+    add_trace(
+      data = df_sub,
+      x = ~Percent_Cover + 0.1,
+      y = ~X_ENDC_RICHNESS_,
+      type = 'scatter',
+      mode = 'markers',
+      name = paste0(dev_type, " (R² = ", r2, ")"),
+      marker = list(size = 5, opacity = 0.5, color = colors[i]),
+      showlegend = TRUE
+    ) %>%
+    # Add bold regression line
+    add_trace(
+      data = line_df,
+      x = ~Percent_Cover + 0.1,
+      y = ~Predicted,
+      type = 'scatter',
+      mode = 'lines',
+      line = list(color = colors[i], width = 3, dash = "solid", opacity = 1),
+      name = paste0(dev_type, " Trend"),
+      showlegend = FALSE
+    )
+}
+
+# Step 4: Final layout
+plot %>%
+  layout(
+    title = "Bee Species Richness vs. Land Development Intensity (with R²)",
+    xaxis = list(title = "% Land Cover (log-scaled)", type = "log"),
+    yaxis = list(title = "Bee Species Richness"),
+    legend = list(title = list(text = "<b>Development Type</b>")),
+    margin = list(l = 60, r = 40, t = 60, b = 50)
+  )
+
+```
+
